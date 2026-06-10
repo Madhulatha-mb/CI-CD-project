@@ -1,25 +1,57 @@
-name: CI-CD
+on: push: branches: 
+-	master 
+ 
+ 
+jobs: build-deploy: 
+runs-on: ubuntu-latest 
+ 
+ 
+steps: 
+-	name: checkout code 
+uses: actions/checkout@v3 
+ 
+ 
+-	name: set-up jdk uses: actions/setup-java@v3 with: 
+distribution: 'temurin' java-version: '17' 
+ 
+# Create secure Maven settings.xml with Nexus creds 
+-	name: Configure Maven settings for Nexus env: 
+NEXUS_USERNAME: ${{ secrets.NEXUS_USER }} 
+NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }} 
+run: | 
+mkdir -p ~/.m2 cat > ~/.m2/settings.xml <<EOF <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd"> 
+<servers> 
+<server> 
+<id>nexus</id> 
+<username>${NEXUS_USERNAME}</username> 
+<password>${NEXUS_PASSWORD}</password> 
+</server> 
+</servers> 
+</settings> 
+EOF 
+ 
+-	name: validate with maven run: mvn validate 
+ 
+-	name: compile with maven run: mvn compile 
+ 
+-	name: test with maven run: mvn test 
+ 
+-	name: package with maven run: mvn package 
+-	name: verify WAR file run: ls -lh target/ 
+ 
+-	name: Build, Test and SonarQube Scan run: | mvn clean verify sonar:sonar \ 
+-Dsonar.projectKey=train-ticket-reservation \ 
+-Dsonar.host.url="${{ secrets.SONAR_HOST }}" \ 
+-Dsonar.login="${{ secrets.SONAR_TOKEN }}" 
+ 
+ 
+# Deploy to Nexus using distributionManagement in POM 
+-	name: Publish WAR to Nexus run: mvn deploy 
+ 
+# Deploy WAR to Tomcat 
+-	name: Deploy to tomcat run: | curl -v -u "${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }}" \ 
+-T target/TrainBook-1.0.0-SNAPSHOT.war \ 
+"http://${{ secrets.TOMCAT_HOST 
+}}:8080/manager/text/deploy?path=/TrainBook&update=true" 
 
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: temurin
-
-    - name: Build
-      run: |
-        cd app
-        mvn clean package
